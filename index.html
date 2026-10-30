@@ -96,21 +96,12 @@ label.filebtn.primary { color: var(--accent-fg); }
 .fr img { width: 100%; max-width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 50%; display: block; }
 .fr[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 </style>
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}.inapp { background: #FFF3D6; color: #3d2c00; border: 1px solid #FFC62F; border-radius: 12px; padding: 12px 14px; margin: 0 0 18px; line-height: 1.5; }
-.inapp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-.inapp-row span { font-weight: 700; word-break: break-all; }
-.inapp-row button { padding: 6px 12px; }
-</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
 </head>
 <body>
 
 
 <div class="wrap">
-  <div id="inapp" class="inapp" hidden>
-    <strong>Chưa mở được trình duyệt?</strong>
-    <span id="inappName">Ứng dụng</span> không cho lưu ảnh trực tiếp. Bấm dấu <b>···</b> ở góc trên bên phải, chọn <b>Mở bằng trình duyệt</b> (hoặc <b>Mở trong Safari</b>), rồi tạo lại ảnh và lưu.
-    <div class="inapp-row"><span id="inappUrl">dagatha9.github.io/khung-avatar-bidv</span><button type="button" id="copyUrl">Sao chép link</button></div>
-  </div>
   <h1>Khung avatar kỷ niệm 20 năm BIDV Phủ Quỳ</h1>
   <p class="lead">Chọn ảnh của bạn, kéo cho vừa khung rồi tạo ảnh đại diện Facebook. Không cần đăng nhập, không cần cài thêm gì.</p>
 
@@ -341,7 +332,6 @@ label.filebtn.primary { color: var(--accent-fg); }
     .forEach(function (p) { if (!INAPP && p[1].test(ua)) INAPP = p[0]; });
   var IOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   var ANDROID = /Android/i.test(ua);
-  function showInapp() { $('inappName').textContent = INAPP || 'Ứng dụng'; $('inapp').hidden = false; $('inapp').scrollIntoView({ behavior: 'smooth' }); }
 
   function saveHere() {
     var file = null;
@@ -373,7 +363,6 @@ label.filebtn.primary { color: var(--accent-fg); }
       // Android: mở Chrome (intent không mang được ảnh, người dùng chọn lại ảnh)
       location.href = 'intent://' + SITE.replace('https://', '') + query + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(SITE + query) + ';end';
     }
-    setTimeout(function () { if (!document.hidden) showInapp(); }, 1800);
   }
 
   $('dl').addEventListener('click', function () {
@@ -399,14 +388,6 @@ label.filebtn.primary { color: var(--accent-fg); }
       setTimeout(function () { $('result').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300);
     } catch (e) {}
   })();
-  $('copyUrl').addEventListener('click', function () {
-    var url = 'https://dagatha9.github.io/khung-avatar-bidv/', btn = this;
-    function done() { btn.textContent = 'Đã sao chép'; }
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { selectUrl(); });
-    else selectUrl();
-    function selectUrl() { var r = document.createRange(); r.selectNodeContents($('inappUrl')); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
-  });
-
   render();
 })();
 </script>
