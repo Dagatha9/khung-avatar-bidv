@@ -107,8 +107,8 @@ label.filebtn.primary { color: var(--accent-fg); }
 
 <div class="wrap">
   <div id="inapp" class="inapp" hidden>
-    <strong>Bạn đang mở trang trong <span id="inappName">ứng dụng</span>.</strong>
-    Ứng dụng này không cho lưu ảnh. Hãy mở bằng trình duyệt: bấm dấu <b>···</b> ở góc trên bên phải, chọn <b>Mở bằng trình duyệt</b> (hoặc <b>Mở trong Safari</b>).
+    <strong>Chưa mở được trình duyệt?</strong>
+    <span id="inappName">Ứng dụng</span> không cho lưu ảnh trực tiếp. Bấm dấu <b>···</b> ở góc trên bên phải, chọn <b>Mở bằng trình duyệt</b> (hoặc <b>Mở trong Safari</b>), rồi tạo lại ảnh và lưu.
     <div class="inapp-row"><span id="inappUrl">dagatha9.github.io/khung-avatar-bidv</span><button type="button" id="copyUrl">Sao chép link</button></div>
   </div>
   <h1>Khung avatar kỷ niệm 20 năm BIDV Phủ Quỳ</h1>
@@ -335,26 +335,70 @@ label.filebtn.primary { color: var(--accent-fg); }
   });
 
   var lastBlob = null, lastUrl = null, NAME = 'avatar-bidv-phu-quy-20-nam.png';
-  $('dl').addEventListener('click', function () {
-    if (!lastBlob) return;
+  var SITE = 'https://dagatha9.github.io/khung-avatar-bidv/';
+  var ua = navigator.userAgent || '', INAPP = null;
+  [['Zalo', /Zalo/i], ['Facebook', /FBAN|FBAV|FB_IAB/i], ['Messenger', /Messenger/i], ['Instagram', /Instagram/i], ['TikTok', /musical_ly|TikTok|Bytedance/i], ['LINE', /\bLine\//i]]
+    .forEach(function (p) { if (!INAPP && p[1].test(ua)) INAPP = p[0]; });
+  var IOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  var ANDROID = /Android/i.test(ua);
+  function showInapp() { $('inappName').textContent = INAPP || 'Ứng dụng'; $('inapp').hidden = false; $('inapp').scrollIntoView({ behavior: 'smooth' }); }
+
+  function saveHere() {
     var file = null;
-    try { file = new File([lastBlob], NAME, { type: 'image/png' }); } catch (e) {}
-    // iPhone/Android: bảng chia sẻ của máy có mục "Lưu hình ảnh"
+    try { file = new File([lastBlob], NAME, { type: lastBlob.type || 'image/png' }); } catch (e) {}
     if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
       navigator.share({ files: [file], title: 'Ảnh đại diện BIDV Phủ Quỳ' }).catch(function () {});
       return;
     }
-    if (INAPP) { showInapp(); $('inapp').scrollIntoView({ behavior: 'smooth' }); return; }
     var a = document.createElement('a'); a.href = lastUrl; a.download = NAME;
     document.body.appendChild(a); a.click(); a.remove();
-  });
+  }
 
-  // nhận biết trình duyệt trong ứng dụng (Zalo, Facebook, Messenger, Instagram, TikTok)
-  var ua = navigator.userAgent || '', INAPP = null;
-  [['Zalo', /Zalo/i], ['Facebook', /FBAN|FBAV|FB_IAB/i], ['Messenger', /Messenger/i], ['Instagram', /Instagram/i], ['TikTok', /musical_ly|TikTok|Bytedance/i], ['LINE', /\bLine\//i]]
-    .forEach(function (p) { if (!INAPP && p[1].test(ua)) INAPP = p[0]; });
-  function showInapp() { $('inappName').textContent = INAPP; $('inapp').hidden = false; }
-  if (INAPP) showInapp();
+  // ảnh đã tạo, nén JPEG để mang theo sang trình duyệt qua phần # của link
+  function packedImage() {
+    var c = document.createElement('canvas'); c.width = c.height = 900;
+    c.getContext('2d').drawImage(cv, 0, 0, 900, 900);
+    var q = 0.86, d = c.toDataURL('image/jpeg', q);
+    while (d.length > 260000 && q > 0.5) { q -= 0.08; d = c.toDataURL('image/jpeg', q); }
+    return d.split(',')[1];
+  }
+  window.__packedImage = packedImage;
+
+  function openInBrowser() {
+    var query = '?f=' + cur;
+    if (IOS) {
+      // iOS 17+: mở thẳng Safari, kèm ảnh đã tạo
+      location.href = 'x-safari-' + SITE + query + '#a=' + packedImage();
+    } else if (ANDROID) {
+      // Android: mở Chrome (intent không mang được ảnh, người dùng chọn lại ảnh)
+      location.href = 'intent://' + SITE.replace('https://', '') + query + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(SITE + query) + ';end';
+    }
+    setTimeout(function () { if (!document.hidden) showInapp(); }, 1800);
+  }
+
+  $('dl').addEventListener('click', function () {
+    if (!lastBlob) return;
+    if (INAPP) { openInBrowser(); return; }
+    saveHere();
+  });
+  if (INAPP) $('dl').textContent = 'Lưu ảnh (mở bằng trình duyệt)';
+
+  // mở từ Zalo sang: chọn lại đúng khung, hiện sẵn ảnh đã tạo
+  (function restore() {
+    var m = /[?&]f=(\d+)/.exec(location.search);
+    if (m) { var btn = document.querySelector('.fr[data-i="' + m[1] + '"]'); if (btn) btn.click(); }
+    var h = /^#a=([A-Za-z0-9+/=]+)$/.exec(location.hash);
+    if (!h) return;
+    try {
+      var bin = atob(h[1]), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      lastBlob = new Blob([arr], { type: 'image/jpeg' }); NAME = NAME.replace('.png', '.jpg');
+      lastUrl = URL.createObjectURL(lastBlob);
+      $('out').src = lastUrl; $('result').hidden = false;
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      setTimeout(function () { $('result').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300);
+    } catch (e) {}
+  })();
   $('copyUrl').addEventListener('click', function () {
     var url = 'https://dagatha9.github.io/khung-avatar-bidv/', btn = this;
     function done() { btn.textContent = 'Đã sao chép'; }
