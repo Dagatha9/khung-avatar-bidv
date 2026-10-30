@@ -96,12 +96,21 @@ label.filebtn.primary { color: var(--accent-fg); }
 .fr img { width: 100%; max-width: 100%; height: auto; aspect-ratio: 1 / 1; border-radius: 50%; display: block; }
 .fr[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 </style>
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)} body{margin:0} img{max-width:100%} [hidden]{display:none!important}.inapp { background: #FFF3D6; color: #3d2c00; border: 1px solid #FFC62F; border-radius: 12px; padding: 12px 14px; margin: 0 0 18px; line-height: 1.5; }
+.inapp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.inapp-row span { font-weight: 700; word-break: break-all; }
+.inapp-row button { padding: 6px 12px; }
+</style>
 </head>
 <body>
 
 
 <div class="wrap">
+  <div id="inapp" class="inapp" hidden>
+    <strong>Bạn đang mở trang trong <span id="inappName">ứng dụng</span>.</strong>
+    Ứng dụng này không cho lưu ảnh. Hãy mở bằng trình duyệt: bấm dấu <b>···</b> ở góc trên bên phải, chọn <b>Mở bằng trình duyệt</b> (hoặc <b>Mở trong Safari</b>).
+    <div class="inapp-row"><span id="inappUrl">dagatha9.github.io/khung-avatar-bidv</span><button type="button" id="copyUrl">Sao chép link</button></div>
+  </div>
   <h1>Khung avatar kỷ niệm 20 năm BIDV Phủ Quỳ</h1>
   <p class="lead">Chọn ảnh của bạn, kéo cho vừa khung rồi tạo ảnh đại diện Facebook. Không cần đăng nhập, không cần cài thêm gì.</p>
 
@@ -172,9 +181,9 @@ label.filebtn.primary { color: var(--accent-fg); }
     <img id="out" alt="Ảnh đại diện đã ghép khung" width="1080" height="1080">
     <div>
       <h2>Ảnh đã sẵn sàng</h2>
-      <p style="margin:0 0 12px"><a id="dl" class="filebtn primary" href="#" download="avatar-bidv-phu-quy-20-nam.png" style="text-decoration:none">Tải ảnh về máy</a></p>
+      <p style="margin:0 0 12px"><button type="button" id="dl" class="primary">Lưu ảnh về máy</button></p>
       <ol>
-        <li>Bấm "Tải ảnh về máy". Nếu điện thoại không tải được, nhấn giữ vào ảnh rồi chọn Lưu ảnh.</li>
+        <li>Bấm "Lưu ảnh về máy". Trên iPhone, bảng chia sẻ hiện ra, chọn <b>Lưu hình ảnh</b>. Hoặc nhấn giữ vào ảnh rồi chọn Lưu vào Ảnh.</li>
         <li>Mở Facebook, vào trang cá nhân, bấm vào ảnh đại diện hiện tại.</li>
         <li>Chọn tải ảnh lên, chọn ảnh vừa lưu và bấm Lưu.</li>
       </ol>
@@ -315,10 +324,43 @@ label.filebtn.primary { color: var(--accent-fg); }
   $('makeBtn').addEventListener('click', function () {
     render();
     var out = $('out');
-    out.src = cv.toDataURL('image/png');
-    var dl = document.getElementById('dl'); if (dl) dl.href = out.src;
+    cv.toBlob(function (blob) {
+      lastBlob = blob;
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(blob);
+      out.src = lastUrl;
+    }, 'image/png');
     $('result').hidden = false;
     $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  var lastBlob = null, lastUrl = null, NAME = 'avatar-bidv-phu-quy-20-nam.png';
+  $('dl').addEventListener('click', function () {
+    if (!lastBlob) return;
+    var file = null;
+    try { file = new File([lastBlob], NAME, { type: 'image/png' }); } catch (e) {}
+    // iPhone/Android: bảng chia sẻ của máy có mục "Lưu hình ảnh"
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Ảnh đại diện BIDV Phủ Quỳ' }).catch(function () {});
+      return;
+    }
+    if (INAPP) { showInapp(); $('inapp').scrollIntoView({ behavior: 'smooth' }); return; }
+    var a = document.createElement('a'); a.href = lastUrl; a.download = NAME;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  // nhận biết trình duyệt trong ứng dụng (Zalo, Facebook, Messenger, Instagram, TikTok)
+  var ua = navigator.userAgent || '', INAPP = null;
+  [['Zalo', /Zalo/i], ['Facebook', /FBAN|FBAV|FB_IAB/i], ['Messenger', /Messenger/i], ['Instagram', /Instagram/i], ['TikTok', /musical_ly|TikTok|Bytedance/i], ['LINE', /\bLine\//i]]
+    .forEach(function (p) { if (!INAPP && p[1].test(ua)) INAPP = p[0]; });
+  function showInapp() { $('inappName').textContent = INAPP; $('inapp').hidden = false; }
+  if (INAPP) showInapp();
+  $('copyUrl').addEventListener('click', function () {
+    var url = 'https://dagatha9.github.io/khung-avatar-bidv/', btn = this;
+    function done() { btn.textContent = 'Đã sao chép'; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { selectUrl(); });
+    else selectUrl();
+    function selectUrl() { var r = document.createRange(); r.selectNodeContents($('inappUrl')); var sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
   });
 
   render();
