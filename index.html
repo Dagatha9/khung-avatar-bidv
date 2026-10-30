@@ -86,6 +86,17 @@ details .inner { padding-top: 10px; }
 .result { margin-top: 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 22px; align-items: start; }
 @media (max-width: 720px) { .result { grid-template-columns: minmax(0, 1fr); } }
 .result img { width: 100%; max-width: 100%; height: auto; border-radius: 50%; display: block; -webkit-touch-callout: default; user-select: auto; }
+.sheet { position: fixed; inset: 0; z-index: 50; background: rgba(0,20,18,.55); display: flex; align-items: flex-end; justify-content: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+.sheet-box { background: var(--surface); color: var(--fg); border-radius: 16px; padding: 18px; width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 12px; max-height: 90vh; overflow: auto; }
+.sheet-box h2 { margin: 0; font-size: 18px; font-weight: 900; color: var(--accent); }
+.sheet-box p { margin: 0; }
+.sheet-opt { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.sheet-opt span { color: var(--muted); font-size: 14px; }
+.sheet-opt button { align-self: flex-start; margin-top: 4px; }
+.sheet-close { align-self: center; }
+.full { position: fixed; inset: 0; z-index: 60; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; }
+.full img { width: 100%; max-width: 100%; height: auto; border-radius: 50%; }
+.full p { color: #cfe; font-size: 13px; margin: 0; text-align: center; }
 .result h2 { margin: 0 0 8px; font-size: 18px; font-weight: 900; color: var(--accent); }
 .result ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
 @media (prefers-reduced-motion: no-preference) { button, .filebtn { transition: filter .15s; } }
@@ -180,6 +191,25 @@ label.filebtn.primary { color: var(--accent-fg); }
       </ol>
     </div>
   </section>
+
+  <div id="oldIos" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="oldIosT">
+    <div class="sheet-box">
+      <h2 id="oldIosT">Lưu ảnh trên iPhone này</h2>
+      <p>Máy đang dùng <b id="iosVer">iOS cũ</b>. Zalo trên phiên bản này không cho lưu ảnh và không cho tự mở Safari. Anh/chị chọn một trong hai cách:</p>
+      <div class="sheet-opt">
+        <b>Cách 1: Chụp màn hình (nhanh nhất)</b>
+        <span>Bấm nút dưới, ảnh hiện toàn màn hình, chụp màn hình rồi dùng ảnh đó làm ảnh đại diện.</span>
+        <button type="button" class="primary" id="fullBtn">Hiện ảnh toàn màn hình</button>
+      </div>
+      <div class="sheet-opt">
+        <b>Cách 2: Làm trên Safari</b>
+        <span>Sao chép link, mở Safari, dán link và tạo lại ảnh. Safari lưu ảnh bình thường.</span>
+        <button type="button" id="copyLink">Sao chép link</button>
+      </div>
+      <button type="button" class="sheet-close" id="sheetClose">Đóng</button>
+    </div>
+  </div>
+  <div id="full" class="full" hidden><img id="fullImg" alt="Ảnh đại diện để chụp màn hình"><p>Chụp màn hình, sau đó chạm vào đây để quay lại</p></div>
 </div>
 
 <script>
@@ -354,23 +384,57 @@ label.filebtn.primary { color: var(--accent-fg); }
   }
   window.__packedImage = packedImage;
 
+  // phiên bản iOS lấy từ trình duyệt (không biết được dòng máy, chỉ biết bản iOS)
+  var IOSVER = (function () { var m = /OS (\d+)[_.](\d+)/.exec(ua); return IOS && m ? +m[1] : 0; })();
+
   function openInBrowser() {
     var query = '?f=' + cur;
     if (IOS) {
-      // iOS 17+: mở thẳng Safari, kèm ảnh đã tạo
-      location.href = 'x-safari-' + SITE + query + '#a=' + packedImage();
-    } else if (ANDROID) {
-      // Android: mở Chrome (intent không mang được ảnh, người dùng chọn lại ảnh)
-      location.href = 'intent://' + SITE.replace('https://', '') + query + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(SITE + query) + ';end';
+      if (IOSVER >= 17) {
+        // iOS 17+: mở thẳng Safari, kèm ảnh đã tạo
+        location.href = 'x-safari-' + SITE + query + '#a=' + packedImage();
+        return;
+      }
+      // iOS 16 trở xuống: thử bảng chia sẻ của máy, không được thì hiện hướng dẫn
+      var file = null;
+      try { file = new File([lastBlob], NAME, { type: lastBlob.type || 'image/png' }); } catch (e) {}
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'Ảnh đại diện BIDV Phủ Quỳ' }).catch(function (err) { if (!err || err.name !== 'AbortError') showOldIos(); });
+        return;
+      }
+      showOldIos();
+      return;
     }
+    // Android: Zalo/Facebook cho tải ảnh bình thường
+    saveHere();
   }
+
+  function showOldIos() {
+    $('iosVer').textContent = IOSVER ? 'iOS ' + IOSVER : 'iOS cũ';
+    $('oldIos').hidden = false;
+  }
+  $('sheetClose').addEventListener('click', function () { $('oldIos').hidden = true; });
+  $('oldIos').addEventListener('click', function (e) { if (e.target === this) this.hidden = true; });
+  $('fullBtn').addEventListener('click', function () { $('fullImg').src = lastUrl; $('oldIos').hidden = true; $('full').hidden = false; });
+  $('full').addEventListener('click', function () { $('full').hidden = true; });
+  $('copyLink').addEventListener('click', function () {
+    var btn = this, url = SITE;
+    function done() { btn.textContent = 'Đã sao chép, mở Safari và dán link'; }
+    function fallback() {
+      var t = document.createElement('textarea'); t.value = url; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select(); t.setSelectionRange(0, url.length);
+      try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = url; }
+      t.remove();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, fallback); else fallback();
+  });
 
   $('dl').addEventListener('click', function () {
     if (!lastBlob) return;
     if (INAPP) { openInBrowser(); return; }
     saveHere();
   });
-  if (INAPP) $('dl').textContent = 'Lưu ảnh (mở bằng trình duyệt)';
+  if (INAPP && IOS && IOSVER >= 17) $('dl').textContent = 'Lưu ảnh (mở bằng Safari)';
 
   // mở từ Zalo sang: chọn lại đúng khung, hiện sẵn ảnh đã tạo
   (function restore() {
